@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Neon Territory v2</title>
+<style>
+:root{--bg:#08101d;--panel:#10192d;--text:#eef4ff;--muted:#9eb2d7;--p:#63a4ff;--pt:#8ee7ff;--b1:#ff7a7a;--b1t:#ffb2b2;--b2:#63e6be;--b2t:#a4f2d8;--b3:#ffd166;--b3t:#ffe4a3}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;background:radial-gradient(circle at top,#15284a 0%,#08101d 58%,#03060d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden}body{display:flex;justify-content:center}.app{width:100%;max-width:560px;min-height:100%;position:relative}.hud{position:fixed;left:50%;transform:translateX(-50%);top:0;width:min(560px,100%);padding:10px;z-index:5;background:linear-gradient(180deg,rgba(8,16,29,.95),rgba(8,16,29,.72));backdrop-filter:blur(8px)}.row{display:flex;gap:8px}.pill{flex:1;background:#ffffff10;border:1px solid #ffffff14;border-radius:14px;padding:10px;text-align:center}.small{font-size:12px;color:var(--muted)}.big{font-weight:800}.boardWrap{position:absolute;inset:86px 0 0 0;padding:10px}.board{display:block;width:100%;height:calc(100vh - 160px);background:#09111f;border-radius:20px;border:1px solid #ffffff12;box-shadow:0 16px 50px rgba(0,0,0,.35)}.controls{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);padding:10px;background:linear-gradient(180deg,rgba(8,16,29,.65),rgba(8,16,29,.95));display:flex;gap:8px;justify-content:center;color:var(--muted);font-size:12px}.overlay{position:fixed;inset:0;background:rgba(3,6,13,.72);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}.modal{width:min(92vw,420px);background:var(--panel);border:1px solid #ffffff14;border-radius:24px;padding:20px;text-align:center}.title{font-size:28px;font-weight:900}.sub{color:var(--muted);line-height:1.4}.input,.check{width:100%;padding:14px;border-radius:14px;border:1px solid #ffffff14;background:#0c1326;color:#fff;margin-top:10px}.check{display:flex;gap:10px;align-items:center;text-align:left}.btn{width:100%;padding:14px;border:none;border-radius:16px;background:linear-gradient(90deg,#7fb0ff,#5f8fff);color:#fff;font-weight:900;margin-top:12px}.hint{font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hud">
+    <div class="row">
+      <div class="pill"><div class="small">Name</div><div class="big" id="uiName">-</div></div>
+      <div class="pill"><div class="small">Status</div><div class="big" id="uiStatus">Ready</div></div>
+      <div class="pill"><div class="small">Area</div><div class="big" id="uiArea">0%</div></div>
+      <div class="pill"><div class="small">Bots</div><div class="big" id="uiBots">0</div></div>
+    </div>
+  </div>
+  <div class="boardWrap"><canvas id="game" class="board"></canvas></div>
+  <div class="controls">Safari Touch • Mausswipe auf dem Feld • WASD • Pfeiltasten</div>
+</div>
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="title">Neon Territory v2</div>
+    <p class="sub">Neuaufbau mit klar sichtbarem Feld. Spielbar per Smartphone Safari, Maus, WASD und Pfeiltasten.</p>
+    <input id="nameInput" class="input" placeholder="Dein Name">
+    <label class="check"><input type="checkbox" id="botsToggle" checked> Bots aktivieren</label>
+    <button class="btn" id="startBtn">Start</button>
+    <div class="hint">Verlasse dein Gebiet, schließe die Linie, erobere Fläche. Berührt jemand deine offene Linie, bist du raus.</div>
+  </div>
+</div>
+<script>
+(()=>{
+const c=document.getElementById('game'),x=c.getContext('2d');
+const ui={name:uiName,status:uiStatus,area:uiArea,bots:uiBots,overlay,btn:startBtn};
+const GRID=10, SPEED=90;
+let W=0,H=0,COLS=0,ROWS=0, grid=[], raf=0, last=0, running=false;
+let swipeStart=null;
+const colors={0:'#0b1220',1:'#4e8fff',2:'#ff6b6b',3:'#39d79a',4:'#ffd166',[-1]:'#8ee7ff',[-2]:'#ffb2b2',[-3]:'#a4f2d8',[-4]:'#ffe4a3'};
+const actors=[];
+function fit(){const r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=r.width;H=r.height;COLS=Math.floor(W/GRID);ROWS=Math.floor(H/GRID)}
+function mkGrid(){grid=Array.from({length:COLS},()=>Array(ROWS).fill(0))}
+function seed(cx,cy,r,col){for(let i=cx-r;i<=cx+r;i++)for(let j=cy-r;j<=cy+r;j++) if(i>=0&&j>=0&&i<COLS&&j<ROWS) grid[i][j]=col}
+function makeActor(name,col,cx,cy,isBot){return {name,col,x:cx,y:cy,dx:1,dy:0,trail:[],inside:true,alive:true,isBot,step:0,turnEvery:8+Math.floor(Math.random()*10)}}
+let player;
+function setup(){fit(); mkGrid(); actors.length=0; player=makeActor(nameInput.value||'Player',1,Math.floor(COLS/2),Math.floor(ROWS/2),false); seed(player.x,player.y,5,1); actors.push(player); if(botsToggle.checked){const spots=[[8,8,2],[COLS-9,8,3],[COLS-9,ROWS-9,4]]; spots.forEach(([sx,sy,col],i)=>{if(sx>5&&sy>5&&sx<COLS-5&&sy<ROWS-5){const b=makeActor('Bot '+(i+1),col,sx,sy,true); seed(b.x,b.y,4,col); actors.push(b)}})} ui.name.textContent=player.name; ui.status.textContent='Alive'; updateHud();}
+function updateHud(){let own=0,total=COLS*ROWS,botsAlive=0; for(let i=0;i<COLS;i++)for(let j=0;j<ROWS;j++) if(grid[i][j]===1) own++; actors.forEach(a=>{if(a.isBot&&a.alive)botsAlive++}); ui.area.textContent=Math.round(own/total*100)+'%'; ui.bots.textContent=botsAlive;}
+function setDir(a,dx,dy){if(a.dx===-dx&&a.dy===-dy) return; a.dx=dx;a.dy=dy}
+function kill(a){a.alive=false; a.trail.forEach(p=>{if(grid[p.x]&&grid[p.x][p.y]===-a.col)grid[p.x][p.y]=0}); a.trail=[]; if(!a.isBot){ui.status.textContent='Dead'; running=false;}}
+function floodClaim(a){for(const p of a.trail) grid[p.x][p.y]=a.col; const out=Array.from({length:COLS},()=>Array(ROWS).fill(false)); const q=[]; const push=(ix,iy)=>{if(ix<0||iy<0||ix>=COLS||iy>=ROWS||out[ix][iy]) return; const v=grid[ix][iy]; if(v===a.col||v===-a.col) return; out[ix][iy]=true; q.push([ix,iy]);};
+for(let i=0;i<COLS;i++){push(i,0);push(i,ROWS-1)} for(let j=0;j<ROWS;j++){push(0,j);push(COLS-1,j)}
+while(q.length){const [ix,iy]=q.shift(); push(ix+1,iy);push(ix-1,iy);push(ix,iy+1);push(ix,iy-1)}
+for(let i=0;i<COLS;i++)for(let j=0;j<ROWS;j++){if(grid[i][j]>=0 && !out[i][j]) grid[i][j]=a.col}
+a.trail=[]; a.inside=true; updateHud();}
+function step(a){if(!a.alive) return; a.x+=a.dx; a.y+=a.dy; if(a.x<0||a.y<0||a.x>=COLS||a.y>=ROWS){kill(a); return;} const cell=grid[a.x][a.y]; if(cell===-a.col){kill(a); return;} if(cell<0 && cell!==-a.col){ const victim=actors.find(o=>o.alive&&o.col===-cell); if(victim) kill(victim); }
+if(cell!==a.col){a.inside=false; a.trail.push({x:a.x,y:a.y}); grid[a.x][a.y]=-a.col;} else if(!a.inside && a.trail.length){floodClaim(a);} }
+function thinkBot(a){if(!a.isBot||!a.alive) return; a.step++; const nx=a.x+a.dx, ny=a.y+a.dy; const blocked=nx<0||ny<0||nx>=COLS||ny>=ROWS||grid[nx][ny]===-a.col; if(blocked || (a.inside && a.step%a.turnEvery===0 && Math.random()<0.45)){ const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>!(dx===-a.dx&&dy===-a.dy)); dirs.sort(()=>Math.random()-.5); for(const [dx,dy] of dirs){const tx=a.x+dx,ty=a.y+dy; if(tx>=0&&ty>=0&&tx<COLS&&ty<ROWS&&grid[tx][ty]!==-a.col){setDir(a,dx,dy); break;}} }}
+function draw(){x.fillStyle='#09111f'; x.fillRect(0,0,W,H); for(let i=0;i<COLS;i++)for(let j=0;j<ROWS;j++){const v=grid[i][j]; if(v!==0){x.fillStyle=colors[v]||'#fff'; x.fillRect(i*GRID,j*GRID,GRID-1,GRID-1);}} actors.forEach(a=>{if(!a.alive)return; x.fillStyle='#fff'; x.fillRect(a.x*GRID,a.y*GRID,GRID-1,GRID-1)});}
+function loop(ts){if(!running){draw(); return;} if(ts-last>SPEED){actors.forEach(thinkBot); actors.forEach(step); draw(); last=ts;} raf=requestAnimationFrame(loop);}
+function start(){setup(); running=true; ui.overlay.style.display='none'; cancelAnimationFrame(raf); last=0; raf=requestAnimationFrame(loop);}
+window.addEventListener('keydown',e=>{if(!player)return; const k=e.key.toLowerCase(); if(k==='arrowup'||k==='w') setDir(player,0,-1); if(k==='arrowdown'||k==='s') setDir(player,0,1); if(k==='arrowleft'||k==='a') setDir(player,-1,0); if(k==='arrowright'||k==='d') setDir(player,1,0);});
+c.addEventListener('mousedown',e=>{swipeStart={x:e.clientX,y:e.clientY}}); c.addEventListener('mouseup',e=>{if(!player||!swipeStart)return; const dx=e.clientX-swipeStart.x, dy=e.clientY-swipeStart.y; if(Math.abs(dx)>Math.abs(dy)) setDir(player,dx>0?1:-1,0); else setDir(player,0,dy>0?1:-1); swipeStart=null;});
+c.addEventListener('touchstart',e=>{const t=e.touches[0]; swipeStart={x:t.clientX,y:t.clientY}},{passive:true}); c.addEventListener('touchend',e=>{if(!player||!swipeStart)return; const t=e.changedTouches[0]; const dx=t.clientX-swipeStart.x, dy=t.clientY-swipeStart.y; if(Math.abs(dx)>Math.abs(dy)) setDir(player,dx>0?1:-1,0); else setDir(player,0,dy>0?1:-1); swipeStart=null;},{passive:true});
+window.addEventListener('resize',()=>{if(running) start(); else fit(); draw();});
+ui.btn.onclick=start; fit(); draw();
+})();
+</script>
+</body>
+</html>
