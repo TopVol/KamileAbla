@@ -1,0 +1,14 @@
+{
+  "name": "neon-territory-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Realtime multiplayer prototype server for Neon Territory",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
