@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PaperIO Multiplayer</title>
+<style>
+body{margin:0;background:#08101d;color:white;font-family:sans-serif;text-align:center}
+canvas{display:block;margin:10px auto;background:#0b1220;border-radius:12px}
+input,button{padding:10px;margin:5px;border-radius:8px;border:none}
+</style>
+</head>
+<body>
+<h2>PaperIO Multiplayer</h2>
+<input id="name" placeholder="Name">
+<button onclick="setName()">Set Name</button>
+<button onclick="respawn()">Respawn</button>
+<canvas id="c" width="480" height="480"></canvas>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+const socket = io("http://localhost:3010");
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let me = null;
+let grid = [];
+let players = [];
+
+socket.on("init", d => { me = d.id; });
+socket.on("world", data => { grid = data.grid; players = data.players; draw(); });
+
+function setName(){ socket.emit("setName", document.getElementById("name").value); }
+function respawn(){ socket.emit("respawn"); }
+
+function draw(){
+  ctx.clearRect(0,0,c.width,c.height);
+
+  // draw grid
+  for(let x=0;x<grid.length;x++){
+    for(let y=0;y<grid[0].length;y++){
+      if(grid[x][y]){
+        ctx.fillStyle = '#222';
+        ctx.fillRect(x*6,y*6,6,6);
+      }
+    }
+  }
+
+  players.forEach(p=>{
+    ctx.strokeStyle = p.color;
+    ctx.beginPath();
+    p.trail.forEach((t,i)=>{
+      if(i===0) ctx.moveTo(t.x*6,t.y*6);
+      else ctx.lineTo(t.x*6,t.y*6);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x*6,p.y*6,6,6);
+
+    ctx.fillStyle = "white";
+    ctx.fillText(p.name, p.x*6, p.y*6-5);
+  });
+}
+
+window.addEventListener("keydown", e=>{
+  if(e.key==='ArrowUp'||e.key==='w') socket.emit('move','up');
+  if(e.key==='ArrowDown'||e.key==='s') socket.emit('move','down');
+  if(e.key==='ArrowLeft'||e.key==='a') socket.emit('move','left');
+  if(e.key==='ArrowRight'||e.key==='d') socket.emit('move','right');
+});
+</script>
+</body>
+</html>
