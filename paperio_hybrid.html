@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PaperIO Hybrid</title>
+<style>
+body{margin:0;background:#08101d;color:white;font-family:sans-serif;text-align:center}
+canvas{display:block;margin:10px auto;background:#0b1220;border-radius:12px}
+input,button{padding:10px;margin:5px;border-radius:8px;border:none}
+.status{font-size:12px;color:#9eb2d7}
+</style>
+</head>
+<body>
+<h2>PaperIO Hybrid</h2>
+<div class="status" id="status">Connecting...</div>
+<input id="name" placeholder="Name">
+<button onclick="setName()">Set Name</button>
+<canvas id="c" width="480" height="480"></canvas>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="hybrid_server_url.example.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let players = [];
+let socket = null;
+let online = false;
+
+function tryConnect(){
+  if(!window.HYBRID_CONFIG.serverUrl){
+    fallbackOffline();
+    return;
+  }
+
+  socket = io(window.HYBRID_CONFIG.serverUrl, {timeout: window.HYBRID_CONFIG.connectTimeoutMs});
+
+  socket.on('connect', ()=>{
+    online = true;
+    statusEl.innerText = 'ONLINE MODE';
+  });
+
+  socket.on('world', data=>{
+    players = data.players;
+    draw();
+  });
+
+  socket.on('connect_error', ()=>{
+    fallbackOffline();
+  });
+
+  setTimeout(()=>{
+    if(!online) fallbackOffline();
+  }, window.HYBRID_CONFIG.connectTimeoutMs);
+}
+
+function fallbackOffline(){
+  online = false;
+  statusEl.innerText = 'OFFLINE MODE';
+  startOffline();
+}
+
+function startOffline(){
+  let x=50,y=50;
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowUp') y--;
+    if(e.key==='ArrowDown') y++;
+    if(e.key==='ArrowLeft') x--;
+    if(e.key==='ArrowRight') x++;
+    drawOffline(x,y);
+  });
+  drawOffline(x,y);
+}
+
+function drawOffline(px,py){
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle='cyan';
+  ctx.fillRect(px*4,py*4,6,6);
+}
+
+function draw(){
+  ctx.clearRect(0,0,c.width,c.height);
+  players.forEach(p=>{
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x*6,p.y*6,6,6);
+  });
+}
+
+function setName(){
+  if(socket && online){
+    socket.emit('setName', document.getElementById('name').value);
+  }
+}
+
+tryConnect();
+</script>
+</body>
+</html>
